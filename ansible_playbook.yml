@@ -3,25 +3,26 @@
   hosts: azure_servers
   become: true
 
-tasks:
-  - name: Task - 1 Update APT package manager repositories cache
-    become: true
-    apt:
-      update_cache: yes
-  - name: Task -2 Install Java using Ansible
-    become: yes
-    apt:
-      name: "{{ packages }}"
-      state: present
-    vars:
-      packages:
-         - openjdk-11-jdk
+  tasks:
+    - name: Task - 1 Update APT package manager repositories cache
+      become: true
+      apt:
+        update_cache: yes
 
-  - name: Copy Spring Boot application JAR
-    ansible.builtin.copy:
-      src: target/app.jar
-      dest: /home/hamza/application.jar
+    - name: Task - 2 Install Java using Ansible
+      become: yes
+      apt:
+        name: "{{ packages }}"
+        state: present
+      vars:
+        packages:
+          - openjdk-11-jdk
 
-  - name: Run Spring Boot application
-    ansible.builtin.shell:
-      cmd: nohup java -jar /home/hamza/app.jar > /dev/null 2>&1 &
+    - name: Copy Spring Boot application JAR
+      ansible.builtin.copy:
+        src: target/app.jar
+        dest: /home/hamza/app.jar
+
+    - name: Run Spring Boot application
+      ansible.builtin.shell:
+        cmd: nohup java -jar /home/hamza/app.jar > /dev/null 2>&1 &
