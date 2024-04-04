@@ -1,0 +1,71 @@
+---
+- name: Configure Azure VM for Docker and Kubernetes
+  hosts: azure_vm
+  become: yes
+
+  tasks:
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Install apt-transport-https, ca-certificates, curl, software-properties-common
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update apt and install Docker CE
+      apt:
+        name: docker-ce
+        state: present
+
+    - name: Enable and start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install Kubernetes packages (kubelet, kubeadm, kubectl)
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Initialize Kubernetes cluster (only on the master node)
+      command: kubeadm init --apiserver-advertise-address={{ ansible_default_ipv4.address }}
+      when: "'master' in group_names"
+
+    - name: Copy kube config to user's home directory
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: $HOME/.kube/config
+        remote_src: yes
+      when: "'master' in group_names"
+
+    - name: Install Weave CNI for pod networking
+      command: kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+      when: "'master' in group_names"
+
+    - name: Join worker nodes to the cluster
+      command: "{{ hostvars[item].kubeadm_join_command }}"
+      when: "'worker' in group_names"
+      loop: "{{ groups['master'] }}"
+      remote_user: "{{ ansible_user }}"
